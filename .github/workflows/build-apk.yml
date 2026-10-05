@@ -12,11 +12,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
@@ -26,19 +21,48 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Cordova & Build Android APK
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Build WebAPK with Bubblewrap
         run: |
-          npm install -g cordova
-          cordova create ragesquad com.nexus.ragesquad RageSquad
-          cd ragesquad
-          rm -rf www/*
-          cp ../index.html www/
-          cordova platform add android
-          cordova build android --debug
+          mkdir -p webapp
+          cp index.html webapp/
+          
+          # Create Web Manifest
+          cat << 'EOF' > webapp/manifest.json
+          {
+            "name": "Rage Squad",
+            "short_name": "RageSquad",
+            "start_url": "index.html",
+            "display": "fullscreen",
+            "orientation": "landscape",
+            "background_color": "#0b0c10",
+            "theme_color": "#0b0c10"
+          }
+          EOF
+
+          npm install -g @bubblewrap/cli
+          yes | bubblewrap init --manifest=webapp/manifest.json --directory=android_app || true
+          
+          # Fallback fast compilation using Capacitor
+          npm install -g @capacitor/cli @capacitor/core
+          mkdir -p gameapp/www
+          cp index.html gameapp/www/
+          cd gameapp
+          npm init -y
+          npm install @capacitor/core @capacitor/android
+          npx cap init "Rage Squad" "com.nexus.ragesquad" --web-dir www
+          npx cap add android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload Finished APK
         uses: actions/upload-artifact@v4
         with:
           name: RageSquad-Game-APK
-          path: ragesquad/platforms/android/app/build/outputs/apk/debug/*.apk
+          path: gameapp/android/app/build/outputs/apk/debug/*.apk
           

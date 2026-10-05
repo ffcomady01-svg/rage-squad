@@ -9,60 +9,141 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Build WebAPK with Bubblewrap
+      - name: Create Native Android App
         run: |
-          mkdir -p webapp
-          cp index.html webapp/
-          
-          # Create Web Manifest
-          cat << 'EOF' > webapp/manifest.json
-          {
-            "name": "Rage Squad",
-            "short_name": "RageSquad",
-            "start_url": "index.html",
-            "display": "fullscreen",
-            "orientation": "landscape",
-            "background_color": "#0b0c10",
-            "theme_color": "#0b0c10"
+          mkdir -p android-project/app/src/main/assets
+          mkdir -p android-project/app/src/main/java/com/nexus/ragesquad
+          mkdir -p android-project/app/src/main/res/values
+
+          # Copy Game HTML
+          cp index.html android-project/app/src/main/assets/index.html
+
+          # Create Manifest
+          cat << 'EOF' > android-project/app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.nexus.ragesquad">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:allowBackup="true"
+                  android:label="Rage Squad"
+                  android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="landscape"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          # Create Strings
+          cat << 'EOF' > android-project/app/src/main/res/values/strings.xml
+          <resources>
+              <string name="app_name">Rage Squad</string>
+          </resources>
+          EOF
+
+          # Create Java WebView Loader
+          cat << 'EOF' > android-project/app/src/main/java/com/nexus/ragesquad/MainActivity.java
+          package com.nexus.ragesquad;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class MainActivity extends Activity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  WebView webView = new WebView(this);
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setAllowFileAccess(true);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.loadUrl("file:///android_asset/index.html");
+                  setContentView(webView);
+              }
           }
           EOF
 
-          npm install -g @bubblewrap/cli
-          yes | bubblewrap init --manifest=webapp/manifest.json --directory=android_app || true
-          
-          # Fallback fast compilation using Capacitor
-          npm install -g @capacitor/cli @capacitor/core
-          mkdir -p gameapp/www
-          cp index.html gameapp/www/
-          cd gameapp
-          npm init -y
-          npm install @capacitor/core @capacitor/android
-          npx cap init "Rage Squad" "com.nexus.ragesquad" --web-dir www
-          npx cap add android
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          # Create Root settings.gradle
+          cat << 'EOF' > android-project/settings.gradle
+          rootProject.name = "RageSquad"
+          include ':app'
+          EOF
+
+          # Create Root build.gradle
+          cat << 'EOF' > android-project/build.gradle
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.1.4'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+          # Create App build.gradle
+          cat << 'EOF' > android-project/app/build.gradle
+          apply plugin: 'com.android.application'
+
+          android {
+              namespace 'com.nexus.ragesquad'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.nexus.ragesquad"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+              }
+          }
+          EOF
+
+      - name: Build APK with Gradle
+        uses: gradle/gradle-build-action@v3
+        with:
+          build-root-directory: android-project
+          arguments: assembleDebug
 
       - name: Upload Finished APK
         uses: actions/upload-artifact@v4
         with:
           name: RageSquad-Game-APK
-          path: gameapp/android/app/build/outputs/apk/debug/*.apk
+          path: android-project/app/build/outputs/apk/debug/*.apk
           

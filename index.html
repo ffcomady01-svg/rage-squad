@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RAGE SQUAD</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  body, html { width: 100%; height: 100%; overflow: hidden; background: #0b0c10; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; }
+  canvas { display: block; width: 100vw; height: 100vh; background: #111; }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(10, 15, 25, 0.95); z-index: 50; }
+  .hidden { display: none !important; }
+  h1 { font-size: 42px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: #ff9800; text-shadow: 0 0 20px rgba(255, 152, 0, 0.8); margin-bottom: 20px; }
+  h2 { font-size: 26px; color: #00e5ff; margin-bottom: 15px; }
+  .btn { background: linear-gradient(135deg, #ff9800, #e65100); border: 2px solid #ffb74d; color: #fff; font-size: 18px; font-weight: bold; padding: 12px 28px; margin: 8px; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4); }
+  .btn:active { transform: scale(0.95); }
+  .btn-blue { background: linear-gradient(135deg, #00b0ff, #006064); border-color: #80d8ff; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4); }
+  .btn-green { background: linear-gradient(135deg, #00e676, #1b5e20); border-color: #b9f6ca; box-shadow: 0 4px 15px rgba(0, 230, 118, 0.4); }
+  .btn-red { background: linear-gradient(135deg, #ff1744, #b71c1c); border-color: #ff8a80; box-shadow: 0 4px 15px rgba(255, 23, 68, 0.4); }
+  .row { display: flex; flex-direction: row; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .card-container { display: flex; gap: 15px; overflow-x: auto; max-width: 90%; padding: 15px; }
+  .hero-card { background: #1f2833; border: 2px solid #45a29e; border-radius: 12px; padding: 15px; text-align: center; width: 140px; cursor: pointer; transition: 0.2s; }
+  .hero-card.active { border-color: #ff9800; transform: scale(1.05); box-shadow: 0 0 20px #ff9800; }
+  #hud { position: absolute; top: 0; left: 0; width: 100%; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; z-index: 20; }
+  .bar-wrap { width: 180px; height: 18px; background: rgba(0,0,0,0.6); border: 2px solid #555; border-radius: 9px; overflow: hidden; margin-bottom: 5px; }
+  .bar-fill { height: 100%; width: 100%; transition: width 0.1s linear; }
+  #hp-fill { background: linear-gradient(90deg, #ff1744, #ff5252); }
+  #rage-fill { background: linear-gradient(90deg, #ff9100, #ffea00); width: 0%; }
+  #controls-layer { position: absolute; inset: 0; pointer-events: none; z-index: 30; }
+  .touch-btn { position: absolute; width: 65px; height: 65px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.4); pointer-events: auto; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 16px; color: #fff; text-shadow: 0 0 5px #000; }
+  .touch-btn:active { background: rgba(255, 152, 0, 0.5); border-color: #ff9800; }
+  #btn-pause { position: absolute; top: 12px; right: 20px; width: 45px; height: 45px; border-radius: 8px; font-size: 20px; pointer-events: auto; }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div id="hud">
+  <div>
+    <div style="font-weight: bold; font-size: 14px; margin-bottom: 3px;" id="hero-display-name">SHADOW</div>
+    <div class="bar-wrap"><div id="hp-fill" class="bar-fill"></div></div>
+    <div class="bar-wrap"><div id="rage-fill" class="bar-fill"></div></div>
+  </div>
+  <div style="text-align: right; pointer-events: auto;">
+    <div style="font-size: 20px; font-weight: 900; color: #00e5ff;" id="level-display">LEVEL 1</div>
+    <div style="font-size: 16px; color: #ffd600;" id="coin-display">🪙 0</div>
+    <button class="btn btn-red" id="btn-pause" onclick="togglePause()">⏸</button>
+  </div>
+</div>
+<div id="controls-layer">
+  <div class="touch-btn" id="ctrl-left" style="bottom: 30px; left: 30px;">◀</div>
+  <div class="touch-btn" id="ctrl-right" style="bottom: 30px; left: 110px;">▶</div>
+  <div class="touch-btn" id="ctrl-jump" style="bottom: 110px; right: 40px; background: rgba(0,229,255,0.25);">▲</div>
+  <div class="touch-btn" id="ctrl-shoot" style="bottom: 30px; right: 120px; background: rgba(255,23,68,0.3);">🔥</div>
+  <div class="touch-btn" id="ctrl-skill" style="bottom: 30px; right: 40px; background: rgba(255,152,0,0.3);">⚡</div>
+</div>
+<div class="overlay" id="screen-main">
+  <h1>RAGE SQUAD</h1>
+  <div class="row">
+    <button class="btn btn-green" onclick="startGame()">▶ PLAY NEXT LEVEL</button>
+  </div>
+  <div class="row">
+    <button class="btn btn-blue" onclick="openHeroSelect()">🎒 SQUAD / BACKPACK</button>
+    <button class="btn btn-blue" onclick="openShop()">🛒 ITEM SHOP</button>
+    <button class="btn" onclick="openDressUp()">👗 DRESS UP</button>
+    <button class="btn" onclick="openCustomControls()">⚙ CONTROLS</button>
+  </div>
+</div>
+<div class="overlay hidden" id="screen-squad">
+  <h2>SELECT HERO</h2>
+  <div class="card-container" id="hero-list"></div>
+  <button class="btn btn-green" onclick="backToMain()">DONE</button>
+</div>
+<div class="overlay hidden" id="screen-shop">
+  <h2>ITEM SHOP</h2>
+  <div style="margin-bottom: 20px; font-size: 20px; color: #ffd600;" id="shop-coin-count">🪙 0 COINS</div>
+  <div class="row">
+    <button class="btn btn-blue" onclick="buyItem('damage')">UPGRADE DAMAGE (+25%) [100 🪙]</button>
+    <button class="btn btn-blue" onclick="buyItem('maxhp')">UPGRADE HEALTH (+50 HP) [120 🪙]</button>
+    <button class="btn btn-blue" onclick="buyItem('shield')">BUY RESPAWN SHIELD [150 🪙]</button>
+  </div>
+  <button class="btn btn-red" onclick="backToMain()">BACK</button>
+</div>
+<div class="overlay hidden" id="screen-dress">
+  <h2>DRESS UP & SUIT COLOR</h2>
+  <div class="row" style="margin-bottom: 20px;">
+    <button class="btn" style="background: #2979ff;" onclick="setSuitColor('#2979ff')">NEON BLUE</button>
+    <button class="btn" style="background: #ff1744;" onclick="setSuitColor('#ff1744')">CRIMSON RED</button>
+    <button class="btn" style="background: #ffd600; color: #000;" onclick="setSuitColor('#ffd600')">CYBER YELLOW</button>
+    <button class="btn" style="background: #00e676; color: #000;" onclick="setSuitColor('#00e676')">TOXIC GREEN</button>
+    <button class="btn" style="background: #e040fb;" onclick="setSuitColor('#e040fb')">DARK PURPLE</button>
+  </div>
+  <button class="btn btn-green" onclick="backToMain()">APPLY</button>
+</div>
+<div class="overlay hidden" id="screen-pause">
+  <h2>GAME PAUSED</h2>
+  <button class="btn btn-green" onclick="togglePause()">RESUME</button>
+  <button class="btn btn-blue" onclick="openHeroSelect(true)">CHANGE SQUAD</button>
+  <button class="btn btn-red" onclick="quitToMainMenu()">QUIT TO MENU</button>
+</div>
+<div class="overlay hidden" id="screen-controls">
+  <h2>CUSTOMIZE BUTTON POSITIONS</h2>
+  <p style="color: #b0bec5; margin-bottom: 20px;">बटन्स को अपनी पसंद की जगह पर ड्रैग करें</p>
+  <button class="btn btn-green" onclick="saveControls()">SAVE CONTROLS</button>
+</div>
+<script>
+const HEROES = [
+  { id: 'shadow', name: 'SHADOW', role: 'Sniper / Stealth', hp: 180, speed: 6.5, dmg: 45, reload: 40, ability: 'Shadow Step (Teleport)', color: '#00e5ff', bulletColor: '#00ffff' },
+  { id: 'blaze', name: 'BLAZE', role: 'Assault', hp: 220, speed: 5.5, dmg: 22, reload: 12, ability: 'Inferno Rage (+Dmg & Spd)', color: '#ff3d00', bulletColor: '#ff9100' },
+  { id: 'volt', name: 'VOLT', role: 'SMG Specialist', hp: 190, speed: 7.2, dmg: 14, reload: 7, ability: 'Speed Blitz', color: '#ffd600', bulletColor: '#ffff00' },
+  { id: 'frost', name: 'FROST', role: 'Shotgun / Tank', hp: 260, speed: 4.8, dmg: 18, reload: 28, ability: 'Ice Shield (Absorb & Slow)', color: '#00b0ff', bulletColor: '#80d8ff' },
+  { id: 'raptor', name: 'RAPTOR', role: 'Heavy Explosives', hp: 240, speed: 4.5, dmg: 70, reload: 55, ability: 'Rocket Jump (Blast Air)', color: '#76ff03', bulletColor: '#b2ff59' }
+];
+let state = { currentHero: HEROES[0], suitColor: null, level: 1, coins: 0, dmgBuff: 1, hpBuff: 0, respawnShield: false, isPaused: false, inGame: false };
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+const input = { left: false, right: false, jump: false, shoot: false, skill: false };
+function bindTouch(id, prop) {
+  const el = document.getElementById(id);
+  el.addEventListener('touchstart', (e) => { e.preventDefault(); input[prop] = true; });
+  el.addEventListener('touchend', (e) => { e.preventDefault(); input[prop] = false; });
+}
+bindTouch('ctrl-left', 'left');
+bindTouch('ctrl-right', 'right');
+bindTouch('ctrl-jump', 'jump');
+bindTouch('ctrl-shoot', 'shoot');
+bindTouch('ctrl-skill', 'skill');
+let player = null, enemies = [], bullets = [], particles = [], platforms = [], rageMeter = 0, levelEnemiesRemaining = 0;
+function buildMap(lvl) {
+  platforms = [
+    { x: 0, y: canvas.height - 50, w: canvas.width, h: 60 },
+    { x: canvas.width * 0.15, y: canvas.height - 180, w: canvas.width * 0.25, h: 20 },
+    { x: canvas.width * 0.6, y: canvas.height - 180, w: canvas.width * 0.25, h: 20 },
+    { x: canvas.width * 0.35, y: canvas.height - 300, w: canvas.width * 0.3, h: 20 }
+  ];
+}
+class Player {
+  constructor() {
+    this.w = 32; this.h = 50; this.x = 100; this.y = canvas.height - 150;
+    this.vx = 0; this.vy = 0; this.facing = 1; this.onGround = false;
+    this.hp = state.currentHero.hp + state.hpBuff; this.maxHp = this.hp;
+    this.shootTimer = 0; this.skillCooldown = 0; this.shieldActive = false;
+  }
+  update() {
+    if (input.left) { this.vx = -state.currentHero.speed; this.facing = -1; }
+    else if (input.right) { this.vx = state.currentHero.speed; this.facing = 1; }
+    else { this.vx *= 0.7; }
+    if (input.jump && this.onGround) { this.vy = -14; this.onGround = false; spawnParticles(this.x + 16, this.y + 45, 10, '#ffffff'); }
+    this.vy += 0.65; this.x += this.vx; this.y += this.vy;
+    this.onGround = false;
+    platforms.forEach(p => {
+      if (this.x + this.w > p.x && this.x < p.x + p.w && this.y + this.h >= p.y && this.y + this.h <= p.y + p.h && this.vy >= 0) {
+        this.y = p.y - this.h; this.vy = 0; this.onGround = true;
+      }
+    });
+    if (this.x < 0) this.x = 0;
+    if (this.x > canvas.width - this.w) this.x = canvas.width - this.w;
+    if (this.shootTimer > 0) this.shootTimer--;
+    if (input.shoot && this.shootTimer <= 0) this.fireWeapon();
+    if (this.skillCooldown > 0) this.skillCooldown--;
+    if (input.skill && this.skillCooldown <= 0) this.activateSkill();
+  }
+  fireWeapon() {
+    this.shootTimer = state.currentHero.reload;
+    const bulletDmg = state.currentHero.dmg * state.dmgBuff;
+    const dir = this.facing;
+    if (state.currentHero.id === 'frost') {
+      for (let i = -1; i <= 1; i++) bullets.push(new Bullet(this.x + 16, this.y + 20, dir * 14, i * 2, bulletDmg, state.currentHero.bulletColor, true));
+    } else if (state.currentHero.id === 'raptor') {
+      bullets.push(new Rocket(this.x + 16, this.y + 20, dir * 11, bulletDmg));
+    } else {
+      bullets.push(new Bullet(this.x + 16, this.y + 20, dir * 18, 0, bulletDmg, state.currentHero.bulletColor, true));
+    }
+    spawnParticles(this.x + (dir === 1 ? 30 : -5), this.y + 20, 6, state.currentHero.bulletColor);
+  }
+  activateSkill() {
+    this.skillCooldown = 180;
+    const hid = state.currentHero.id;
+    if (hid === 'shadow') {
+      spawnParticles(this.x + 16, this.y + 25, 25, '#00e5ff');
+      this.x += this.facing * 180;
+      spawnParticles(this.x + 16, this.y + 25, 25, '#00e5ff');
+    } else if (hid === 'blaze') {
+      spawnParticles(this.x + 16, this.y + 25, 40, '#ff3d00');
+      enemies.forEach(e => { if (Math.abs(e.x - this.x) < 250) e.takeDamage(60); });
+    } else if (hid === 'volt') {
+      this.vx = this.facing * 22;
+      spawnParticles(this.x + 16, this.y + 25, 30, '#ffd600');
+    } else if (hid === 'frost') {
+      this.shieldActive = true;
+      setTimeout(() => this.shieldActive = false, 4000);
+      spawnParticles(this.x + 16, this.y + 25, 30, '#80d8ff');
+    } else if (hid === 'raptor') {
+      this.vy = -18;
+      bullets.push(new Rocket(this.x + 16, this.y + 40, 0, 80, true));
+      spawnParticles(this.x + 16, this.y + 50, 35, '#76ff03');
+    }
+  }
+  draw() {
+    ctx.save();
+    if (this.shieldActive) {
+      ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(this.x + 16, this.y + 25, 36, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = state.suitColor || state.currentHero.color;
+    ctx.fillRect(this.x, this.y, this.w, this.h);
+    ctx.fillStyle = '#fff';
+    const eyeX = this.facing === 1 ? this.x + 18 : this.x + 4;
+    ctx.fillRect(eyeX, this.y + 8, 10, 6);
+    ctx.fillStyle = '#37474f';
+    const gunX = this.facing === 1 ? this.x + 20 : this.x - 12;
+    ctx.fillRect(gunX, this.y + 20, 24, 7);
+    ctx.restore();
+  }
+}
+class Bullet {
+  constructor(x, y, vx, vy, dmg, color, isPlayer = true) {
+    this.x = x; this.y = y; this.vx = vx; this.vy = vy; this.dmg = dmg; this.color = color; this.isPlayer = isPlayer;
+    this.marked = false;
+  }
+  update() { this.x += this.vx; this.y += this.vy; if (this.x < 0 || this.x > canvas.width) this.marked = true; }
+  draw() { ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, 10, 4); }
+}
+class Rocket extends Bullet {
+  constructor(x, y, vx, dmg, down = false) { super(x, y, vx, down ? 10 : 0, dmg, '#76ff03', true); }
+  draw() { ctx.fillStyle = '#76ff03'; ctx.fillRect(this.x, this.y, 14, 6); }
+}
+class Enemy {
+  constructor(type, x, y) {
+    this.type = type; this.x = x; this.y = y; this.marked = false;
+    if (type === 1) { this.w = 28; this.h = 45; this.hp = 35; this.speed = 2; this.color = '#78909c'; this.dmg = 5; }
+    else if (type === 2) { this.w = 30; this.h = 48; this.hp = 65; this.speed = 2.5; this.color = '#1e88e5'; this.dmg = 10; }
+    else if (type === 3) { this.w = 30; this.h = 48; this.hp = 110; this.speed = 3.5; this.color = '#8e24aa'; this.dmg = 15; }
+    else if (type === 4) { this.w = 42; this.h = 55; this.hp = 220; this.speed = 1.2; this.color = '#d32f2f'; this.dmg = 25; }
+    else if (type === 5) { this.w = 32; this.h = 50; this.hp = 130; this.speed = 2.8; this.color = '#00bcd4'; this.dmg = 12; }
+    else if (type === 6) { this.w = 32; this.h = 50; this.hp = 150; this.speed = 3; this.color = '#ff6f00'; this.dmg = 20; }
+    else if (type === 7) { this.w = 64; this.h = 85; this.hp = 800 + (state.level * 80); this.speed = 1.5; this.color = '#212121'; this.dmg = 35; }
+    this.maxHp = this.hp; this.shootTimer = 0;
+  }
+  update() {
+    const dir = player.x > this.x ? 1 : -1;
+    this.x += dir * this.speed;
+    this.shootTimer++;
+    if (this.type >= 4 && this.shootTimer > 80) {
+      this.shootTimer = 0;
+      bullets.push(new Bullet(this.x + 15, this.y + 20, dir * 7, 0, this.dmg, '#ff1744', false));
+    }
+    if (Math.abs(player.x - this.x) < 25 && Math.abs(player.y - this.y) < 35) {
+      if (!player.shieldActive) { player.hp -= 0.5; if (player.hp <= 0) gameOver(); }
+    }
+  }
+  takeDamage(amount) {
+    this.hp -= amount;
+    spawnParticles(this.x + 15, this.y + 20, 5, this.color);
+    if (this.hp <= 0) {
+      this.marked = true;
+      state.coins += (this.type === 7 ? 50 : 5);
+      rageMeter = Math.min(100, rageMeter + 10);
+      spawnParticles(this.x + 15, this.y + 20, 20, '#ff9800');
+    }
+  }
+  draw() {
+    ctx.fillStyle = this.color;
+    ctx.fillRect(this.x, this.y, this.w, this.h);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(this.x, this.y - 10, this.w, 5);
+    ctx.fillStyle = '#00e676';
+    ctx.fillRect(this.x, this.y - 10, (this.hp / this.maxHp) * this.w, 5);
+  }
+}
+function spawnParticles(x, y, count, color) {
+  for (let i = 0; i < count; i++) {
+    particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 25, color: color });
+  }
+}
+function spawnWave() {
+  enemies = [];
+  const isBossLevel = state.level % 10 === 0;
+  levelEnemiesRemaining = isBossLevel ? 1 : 6 + state.level * 2;
+  if (isBossLevel) {
+    enemies.push(new Enemy(7, canvas.width - 150, canvas.height - 140));
+  } else {
+    for (let i = 0; i < Math.min(5, levelEnemiesRemaining); i++) {
+      let enemyType = 1;
+      if (state.level > 5) enemyType = Math.min(6, Math.floor(Math.random() * (state.level > 20 ? 6 : 4)) + 1);
+      enemies.push(new Enemy(enemyType, canvas.width - (i * 80 + 100), canvas.height - 100));
+    }
+  }
+}
+function gameLoop() {
+  if (state.inGame && !state.isPaused) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#263238';
+    platforms.forEach(p => {
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = '#37474f';
+      ctx.fillRect(p.x, p.y, p.w, 4);
+      ctx.fillStyle = '#263238';
+    });
+    player.update();
+    player.draw();
+    bullets.forEach(b => {
+      b.update(); b.draw();
+      if (b.isPlayer) {
+        enemies.forEach(e => {
+          if (b.x > e.x && b.x < e.x + e.w && b.y > e.y && b.y < e.y + e.h) {
+            e.takeDamage(b.dmg); b.marked = true;
+          }
+        });
+      } else {
+        if (b.x > player.x && b.x < player.x + player.w && b.y > player.y && b.y < player.y + player.h) {
+          if (!player.shieldActive) player.hp -= b.dmg;
+          b.marked = true;
+          if (player.hp <= 0) gameOver();
+        }
+      }
+    });
+    bullets = bullets.filter(b => !b.marked);
+    enemies.forEach(e => { e.update(); e.draw(); });
+    enemies = enemies.filter(e => !e.marked);
+    if (enemies.length === 0) {
+      state.level++;
+      if (state.level > 50) state.level = 1;
+      spawnWave();
+    }
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.life--;
+      ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 3, 3);
+    });
+    particles = particles.filter(p => p.life > 0);
+    document.getElementById('hp-fill').style.width = Math.max(0, (player.hp / player.maxHp) * 100) + '%';
+    document.getElementById('rage-fill').style.width = rageMeter + '%';
+    document.getElementById('level-display').innerText = 'LEVEL ' + state.level;
+    document.getElementById('coin-display').innerText = '🪙 ' + state.coins;
+  }
+  requestAnimationFrame(gameLoop);
+}
+function startGame() {
+  document.getElementById('screen-main').classList.add('hidden');
+  buildMap(state.level);
+  player = new Player();
+  document.getElementById('hero-display-name').innerText = state.currentHero.name;
+  state.inGame = true;
+  state.isPaused = false;
+  spawnWave();
+}
+function togglePause() {
+  state.isPaused = !state.isPaused;
+  const pauseScreen = document.getElementById('screen-pause');
+  if (state.isPaused) pauseScreen.classList.remove('hidden');
+  else pauseScreen.classList.add('hidden');
+}
+function quitToMainMenu() {
+  state.inGame = false;
+  state.isPaused = false;
+  document.getElementById('screen-pause').classList.add('hidden');
+  document.getElementById('screen-main').classList.remove('hidden');
+}
+function gameOver() {
+  alert('MISSION FAILED! Returning to HQ...');
+  quitToMainMenu();
+}
+function openHeroSelect(fromPause = false) {
+  const list = document.getElementById('hero-list');
+  list.innerHTML = '';
+  HEROES.forEach(h => {
+    const card = document.createElement('div');
+    card.className = 'hero-card' + (state.currentHero.id === h.id ? ' active' : '');
+    card.innerHTML = `<h3 style="color:${h.color}">${h.name}</h3><p style="font-size:12px;">${h.role}</p><p style="font-size:10px; color:#ffd600; margin-top:5px;">${h.ability}</p>`;
+    card.onclick = () => {
+      state.currentHero = h;
+      if (player) { player.hp = h.hp + state.hpBuff; player.maxHp = player.hp; }
+      openHeroSelect(fromPause)

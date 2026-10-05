@@ -35,11 +35,12 @@ jobs:
               <uses-permission android:name="android.permission.INTERNET" />
               <application
                   android:label="Rage Squad"
+                  android:hardwareAccelerated="true"
                   android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
-                      android:screenOrientation="landscape"
+                      android:screenOrientation="sensorLandscape"
                       android:configChanges="orientation|screenSize|keyboardHidden">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
@@ -60,6 +61,8 @@ jobs:
           package com.nexus.ragesquad;
           import android.app.Activity;
           import android.os.Bundle;
+          import android.view.View;
+          import android.webkit.WebChromeClient;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
@@ -72,7 +75,16 @@ jobs:
                   WebSettings settings = webView.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
+                  settings.setDatabaseEnabled(true);
                   settings.setAllowFileAccess(true);
+                  settings.setAllowContentAccess(true);
+                  settings.setMediaPlaybackRequiresUserGesture(false);
+                  
+                  webView.setFocusable(true);
+                  webView.setFocusableInTouchMode(true);
+                  webView.setClickable(true);
+                  
+                  webView.setWebChromeClient(new WebChromeClient());
                   webView.setWebViewClient(new WebViewClient());
                   webView.loadUrl("file:///android_asset/index.html");
                   setContentView(webView);
